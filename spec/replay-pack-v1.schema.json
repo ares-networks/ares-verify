@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ares-networks/ares-verify/spec/replay-pack-v1.schema.json",
+  "title": "Replay pack v1",
+  "description": "Schemas for the JSON files in a replay pack. FORMAT.md is normative; this file describes shapes only. Pick a definition with $ref, e.g. #/$defs/manifest.",
+  "$defs": {
+    "hex256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "b64": {"type": "string", "pattern": "^[A-Za-z0-9+/]*={0,2}$"},
+    "time": {"type": "string", "format": "date-time"},
+    "manifest": {
+      "type": "object",
+      "required": ["packVersion", "tenant", "scope", "root", "exportedAt", "exporter", "hashesOnly", "files", "signature"],
+      "properties": {
+        "packVersion": {"const": 1},
+        "tenant": {"type": "string"},
+        "scope": {"enum": ["job", "session-tree"]},
+        "root": {
+          "type": "object",
+          "required": ["sessionId"],
+          "properties": {
+            "sessionId": {"type": "string"},
+            "initiatorId": {"type": "string"},
+            "ownerId": {"type": "string"}
+          }
+        },
+        "exportedAt": {"$ref": "#/$defs/time"},
+        "exporter": {
+          "type": "object",
+          "required": ["mspId", "certPem"],
+          "properties": {"mspId": {"type": "string"}, "certPem": {"type": "string"}}
+        },
+        "hashesOnly": {"type": "boolean"},
+        "sources": {
+          "type": "object",
+          "properties": {
+            "sessions": {"enum": ["ledger", "index"]},
+            "monitor": {"enum": ["ledger", "index", "not-configured"]}
+          }
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "sha256", "size"],
+            "properties": {
+              "path": {"type": "string"},
+              "sha256": {"$ref": "#/$defs/hex256"},
+              "size": {"type": "integer", "minimum": 0}
+            }
+          }
+        },
+        "signature": {
+          "type": "object",
+          "required": ["alg", "value"],
+          "properties": {"alg": {"const": "ECDSA-P256-SHA256"}, "value": {"$ref": "#/$defs/b64"}}
+        }
+      }
+    },
+    "record": {
+      "type": "object",
+      "required": ["seq", "time", "kind", "session", "decision", "channel", "key", "valueHash", "tx", "prevHash", "hash"],
+      "properties": {
+        "seq": {"type": "integer", "minimum": 1},
+        "time": {"$ref": "#/$defs/time"},
+        "kind": {"enum": ["session-open", "filters", "activate", "intersect", "promote", "expire", "session-write", "redaction", "guard-exception", "language-exception"]},
+        "session": {"type": "string"},
+        "agent": {"type": "string"},
+        "action": {"type": "string"},
+        "decision": {"enum": ["record", "allow", "narrow", "refuse", "redact", "revoke", "human"]},
+        "reason": {"type": "string"},
+        "channel": {"type": "string"},
+        "key": {"type": "string"},
+        "valueHash": {"anyOf": [{"$ref": "#/$defs/hex256"}, {"const": ""}]},
+        "tx": {"type": "string"},
+        "prevHash": {"$ref": "#/$defs/hex256"},
+        "hash": {"$ref": "#/$defs/hex256"}
+      }
+    },
+    "tx": {
+      "type": "object",
+      "required": ["txId", "channel"],
+      "properties": {
+        "txId": {"type": "string"},
+        "channel": {"type": "string"},
+        "blockNumber": {"type": "integer", "minimum": 0},
+        "timestamp": {"$ref": "#/$defs/time"},
+        "validationCode": {"type": "string"},
+        "function": {"type": "string"},
+        "creatorMsp": {"type": "string"},
+        "proposalResponsePayload": {"$ref": "#/$defs/b64"},
+        "endorsements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["endorser", "signature"],
+            "properties": {"endorser": {"$ref": "#/$defs/b64"}, "signature": {"$ref": "#/$defs/b64"}}
+          }
+        },
+        "withheld": {"type": "boolean"}
+      },
+      "if": {"properties": {"withheld": {"const": true}}, "required": ["withheld"]},
+      "then": {"not": {"required": ["proposalResponsePayload"]}},
+      "else": {"required": ["proposalResponsePayload", "endorsements"]}
+    },
+    "parties": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["mspId", "channels", "rootCertsPem"],
+        "properties": {
+          "mspId": {"type": "string"},
+          "displayName": {"type": "string"},
+          "channels": {"type": "array", "items": {"type": "string"}},
+          "rootCertsPem": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+          "intermediateCertsPem": {"type": "array", "items": {"type": "string"}},
+          "fingerprints": {"type": "array", "items": {"$ref": "#/$defs/hex256"}}
+        }
+      }
+    },
+    "redaction": {
+      "type": "object",
+      "required": ["seq", "redactionId", "redactedDataHash", "content"],
+      "properties": {
+        "seq": {"type": "integer", "minimum": 1},
+        "redactionId": {"type": "string"},
+        "filters": {"type": "array", "items": {"type": "string"}},
+        "redactedDataHash": {"$ref": "#/$defs/b64"},
+        "offchainStorageOnly": {"type": "boolean"},
+        "content": {"anyOf": [{"$ref": "#/$defs/b64"}, {"type": "null"}]}
+      }
+    }
+  }
+}

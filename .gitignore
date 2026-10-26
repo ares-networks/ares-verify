@@ -1,0 +1,4 @@
+/dist/
+/bin/
+*.test
+*.out

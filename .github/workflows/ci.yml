@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: test -z "$(gofmt -l .)"
+      - name: vet
+        run: go vet ./...
+      - name: test
+        run: go test ./...
+      - name: fixtures verify as expected
+        run: |
+          go build -o /tmp/ares-verify ./cmd/ares-verify
+          for f in valid hashes-only; do /tmp/ares-verify testdata/$f.zip; done
+          for f in tampered-record dropped-record missing-endorsement swapped-party-cert; do
+            if /tmp/ares-verify testdata/$f.zip; then echo "$f unexpectedly passed"; exit 1; fi
+          done
+      - name: reproducible build
+        run: make repro
