@@ -1,0 +1,41 @@
+# ares-verify CI + release builds on Bitbucket Pipelines.
+#
+# Every push and pull request: gofmt, vet, tests, CLI smoke on the committed
+# fixtures, a reproducible-build check, and the public-content gate.
+# A v* tag: the same checks (gate required), then release binaries for
+# macOS/Linux/Windows (amd64 + arm64) with SHA256SUMS, kept as pipeline
+# artifacts. Nothing is published anywhere from here.
+#
+# Repository variables: PUBLIC_GATE_PATTERN (secured, see scripts/public-gate.sh).
+image: golang:1.25.7
+
+definitions:
+  caches:
+    gomod: /go/pkg/mod
+  steps:
+    - step: &checks
+        name: checks (fmt, vet, test, smoke, repro, public gate)
+        caches: [gomod]
+        script:
+          - make ci
+
+pipelines:
+  default:
+    - step: *checks
+  pull-requests:
+    '**':
+      - step: *checks
+  tags:
+    'v*':
+      - step:
+          <<: *checks
+          name: checks (release, public gate required)
+          script:
+            - export REQUIRE_PUBLIC_GATE=1
+            - make ci
+      - step:
+          name: release binaries + SHA256SUMS
+          caches: [gomod]
+          script:
+            - make dist VERSION=${BITBUCKET_TAG#v}
+          artifacts: [dist/**]
