@@ -35,6 +35,17 @@ func Text(w io.Writer, r *checks.Result) {
 	for _, f := range r.Refusals {
 		fmt.Fprintf(w, "  %-15s %-15s reason: %s\n", fmt.Sprintf("refused #%d", f.Seq), f.Action, f.Reason)
 	}
+	// Root fingerprints computed from the pack, so a recipient can compare
+	// them with the operator's published values and pass them to --pin.
+	for _, pt := range r.Parties {
+		for _, fp := range pt.Fingerprints {
+			mark := ""
+			if pt.Pinned {
+				mark = "  pinned"
+			}
+			fmt.Fprintf(w, "  %-15s %-5s %s %s%s\n", "root", "", pt.MSPID, fp, mark)
+		}
+	}
 	if r.OK {
 		fmt.Fprintln(w, "result: PASS")
 	} else {

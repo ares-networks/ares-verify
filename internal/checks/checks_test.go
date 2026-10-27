@@ -148,3 +148,74 @@ func TestBodyAndWriteMismatch(t *testing.T) {
 		}
 	}
 }
+
+func TestWithheldNotCountedAsEndorsed(t *testing.T) {
+	fp, err := fixtures.BuildVariant("hashes-only")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, _ := fp.Load("hashes-only.zip")
+	res := checks.Run(p, checks.Options{})
+	d := res.Get(checks.NameEndorsements).Detail
+	if !strings.Contains(d, "on every endorsed transaction") || !strings.HasSuffix(d, "; 1 withheld (no endorsements)") {
+		t.Errorf("endorsements detail %q", d)
+	}
+	if res.Result != checks.Pass || res.Warnings != 1 {
+		t.Errorf("result %s warnings %d, want PASS 1", res.Result, res.Warnings)
+	}
+
+	fp, _ = fixtures.BuildVariant("valid")
+	p, _ = fp.Load("valid.zip")
+	res = checks.Run(p, checks.Options{})
+	if d := res.Get(checks.NameEndorsements).Detail; !strings.Contains(d, "on every transaction (") || strings.Contains(d, "withheld") {
+		t.Errorf("valid endorsements detail %q", d)
+	}
+	if res.Result != checks.Pass || res.Warnings != 0 {
+		t.Errorf("result %s warnings %d, want PASS 0", res.Result, res.Warnings)
+	}
+
+	fp, _ = fixtures.BuildVariant("tampered-record")
+	p, _ = fp.Load("tampered-record.zip")
+	if res := checks.Run(p, checks.Options{}); res.Result != checks.Fail || res.OK {
+		t.Errorf("tampered: result %s ok %v", res.Result, res.OK)
+	}
+}
+
+func TestPartiesReportComputedFingerprints(t *testing.T) {
+	s, err := fixtures.DefaultSpec()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fp, err := fixtures.Build(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, _ := fp.Load("parties.zip")
+	want := map[string]string{
+		s.Orgs[0].MSPID: parties.Fingerprint(s.Orgs[0].CACert),
+		s.Orgs[1].MSPID: parties.Fingerprint(s.Orgs[1].CACert),
+	}
+	res := checks.Run(p, checks.Options{Pins: []string{want[s.Orgs[0].MSPID]}})
+	if len(res.Parties) != 2 {
+		t.Fatalf("parties %+v", res.Parties)
+	}
+	for _, pt := range res.Parties {
+		if len(pt.Fingerprints) != 1 || pt.Fingerprints[0] != want[pt.MSPID] {
+			t.Errorf("%s fingerprints %v want %s", pt.MSPID, pt.Fingerprints, want[pt.MSPID])
+		}
+		if len(pt.Channels) == 0 {
+			t.Errorf("%s has no channels", pt.MSPID)
+		}
+		if pt.Pinned != (pt.MSPID == s.Orgs[0].MSPID) {
+			t.Errorf("%s pinned=%v", pt.MSPID, pt.Pinned)
+		}
+	}
+	// What the report prints must round-trip through --pin.
+	var all []string
+	for _, pt := range res.Parties {
+		all = append(all, pt.Fingerprints...)
+	}
+	if res := checks.Run(p, checks.Options{Pins: all, MinParties: 2}); !res.OK {
+		t.Fatalf("pinning the reported fingerprints should pass: %+v", res.Checks)
+	}
+}

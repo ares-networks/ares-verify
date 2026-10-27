@@ -68,12 +68,27 @@ type Refusal struct {
 	Reason string `json:"reason"`
 }
 
+// PartyInfo is one organisation as the verifier sees it. Fingerprints are
+// computed from the root certificates in the pack, never copied from the
+// pack's own fingerprint list, so a recipient can compare them with a source
+// they trust before pinning.
+type PartyInfo struct {
+	MSPID        string   `json:"mspId"`
+	DisplayName  string   `json:"displayName,omitempty"`
+	Channels     []string `json:"channels"`
+	Fingerprints []string `json:"rootFingerprints"`
+	Pinned       bool     `json:"pinned"`
+}
+
 type Result struct {
-	Pack     string    `json:"pack"`
-	Checks   []Check   `json:"checks"`
-	Summary  Summary   `json:"summary"`
-	Refusals []Refusal `json:"refusals"`
-	OK       bool      `json:"ok"`
+	Pack     string      `json:"pack"`
+	Result   string      `json:"result"`   // PASS or FAIL, as the text report's last line
+	Warnings int         `json:"warnings"` // checks with status WARN; they do not fail the pack
+	Checks   []Check     `json:"checks"`
+	Summary  Summary     `json:"summary"`
+	Refusals []Refusal   `json:"refusals"`
+	Parties  []PartyInfo `json:"parties"`
+	OK       bool        `json:"ok"`
 }
 
 // Get returns the check with name n.
@@ -126,13 +141,36 @@ func Run(p *pack.Pack, opt Options) *Result {
 		"%d allowed, %d refused, %d redacted, %d sent to a human, %d revoked",
 		sum.Allowed, sum.Refused, sum.Redacted, sum.Human, sum.Revoked)})
 
+	res.Parties = partyInfo(set)
 	res.OK = true
 	for _, c := range res.Checks {
-		if c.Status == Fail {
+		switch c.Status {
+		case Fail:
 			res.OK = false
+		case Warn:
+			res.Warnings++
 		}
 	}
+	res.Result = Pass
+	if !res.OK {
+		res.Result = Fail
+	}
 	return res
+}
+
+func partyInfo(set *parties.Set) []PartyInfo {
+	out := make([]PartyInfo, 0, len(set.Order))
+	for _, id := range set.Order {
+		pt := set.ByMSP[id]
+		chs := make([]string, 0, len(pt.Channels))
+		for ch := range pt.Channels {
+			chs = append(chs, ch)
+		}
+		sort.Strings(chs)
+		out = append(out, PartyInfo{MSPID: pt.MSPID, DisplayName: pt.DisplayName, Channels: chs,
+			Fingerprints: append([]string{}, pt.Fingerprints...), Pinned: pt.Pinned})
+	}
+	return out
 }
 
 func checkManifest(p *pack.Pack, set *parties.Set) Check {
@@ -412,9 +450,20 @@ func checkEndorsements(p *pack.Pack, set *parties.Set, partyProblems []string, p
 			maxM = m
 		}
 	}
+	// Withheld transactions (hashes-only export) carry no endorsements and are
+	// not in prps. Say so, rather than letting "every transaction" cover them.
+	withheld := map[string]bool{}
+	for _, r := range p.Records {
+		if t, has := p.Txs[r.Tx]; r.Tx != "" && has && t.Withheld {
+			withheld[r.Tx] = true
+		}
+	}
 	if len(ids) == 0 {
 		if len(c.Problems) == 0 {
 			c.Status = Warn
+		}
+		if len(withheld) > 0 {
+			return finish(c, fmt.Sprintf("no transactions to check, %d withheld (no endorsements)", len(withheld)))
 		}
 		return finish(c, "no transactions to check")
 	}
@@ -423,11 +472,18 @@ func checkEndorsements(p *pack.Pack, set *parties.Set, partyProblems []string, p
 		names = append(names, n)
 	}
 	sort.Strings(names)
+	scope := "transaction"
+	if len(withheld) > 0 {
+		scope = "endorsed transaction"
+	}
 	var detail string
 	if minN == maxN {
-		detail = fmt.Sprintf("%d of %d parties on every transaction (%s)", minN, maxM, strings.Join(names, ", "))
+		detail = fmt.Sprintf("%d of %d parties on every %s (%s)", minN, maxM, scope, strings.Join(names, ", "))
 	} else {
-		detail = fmt.Sprintf("%d to %d of %d parties per transaction (%s)", minN, maxN, maxM, strings.Join(names, ", "))
+		detail = fmt.Sprintf("%d to %d of %d parties per %s (%s)", minN, maxN, maxM, scope, strings.Join(names, ", "))
+	}
+	if len(withheld) > 0 {
+		detail += fmt.Sprintf("; %d withheld (no endorsements)", len(withheld))
 	}
 	if pinned {
 		detail += "; pinned"

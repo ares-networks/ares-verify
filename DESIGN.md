@@ -15,7 +15,8 @@ internal/fabtx/      ProposalResponsePayload -> ChaincodeAction -> rwset writes 
                      endorsement = ECDSA DER over sha256(prp || SerializedIdentity)
 internal/parties/    per-MSP root/intermediate pools, fingerprints computed (never trusted), pins
 internal/checks/     the 6 checks in FORMAT.md §8 order -> Result{checks, summary, refusals, ok}
-internal/report/     text (one line per check, first 5 problems) and JSON
+internal/report/     text (one line per check, first 5 problems, root fingerprints) and JSON
+                     (result, warnings, checks, summary, refusals, parties)
 internal/fixtures/   synthetic 2-org packs with real protos and signatures; BuildVariant(name)
 spec/                FORMAT.md (normative), replay-pack-v1.schema.json (shapes)
 testdata/            valid, hashes-only (PASS), tampered-record, dropped-record,
@@ -34,6 +35,13 @@ Rules that are easy to break:
   turn old evidence into FAIL.
 - With `--pin`, an unpinned organisation's valid endorsement does not count,
   and the exporter's organisation must be pinned.
+- Root fingerprints in the report (text `root` lines, JSON
+  `parties[].rootFingerprints`) are computed from the root certificates, never
+  copied from `parties.json` `fingerprints`. They are for comparing with a
+  trusted source before pinning.
+- Withheld transactions have no endorsements, so the endorsements check skips
+  them and its detail says how many ("on every endorsed transaction; N
+  withheld"), never "every transaction".
 - Dependencies stay small: cobra, fabric-protos-go-apiv2, protobuf. No ledger
   SDK.
 - Public repository: no hostnames, deployment or customer names, or internal

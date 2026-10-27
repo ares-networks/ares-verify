@@ -186,7 +186,10 @@ endorsements   Each transaction's endorsement signatures verify, each endorser's
                With --pin, only organisations whose root fingerprint you pinned
                (for example from the operator's published trust page) count.
                Proves: those organisations confirmed the write with their own
-               keys. Without --pin, the roots come from the pack itself.
+               keys. Without --pin, the roots come from the pack itself; the
+               report lists each root's fingerprint so you can compare it with
+               a source you trust. Withheld transactions (hashes-only) have no
+               endorsements and are counted separately.
 
 redactions     Stripped content, where included, matches the hash the ledger
                stored. Hash-only redactions are listed.

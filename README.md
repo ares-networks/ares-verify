@@ -23,7 +23,7 @@ From a checkout: `make build` (writes `bin/ares-verify`), or
 
 ```
 ares-verify pack.zip                  full check, human report; exit 0 pass, 1 fail, 2 unreadable
-ares-verify pack.zip --json           machine report
+ares-verify pack.zip --json           machine report (result, warnings, checks, parties)
 ares-verify pack.zip --pin <fp,...>   only count organisations whose root fingerprint you pinned
 ares-verify pack.zip --min-parties 2  require at least two organisations per transaction
 ares-verify pack.zip --record 118     one record, its transaction and endorsements
@@ -39,8 +39,13 @@ ares-verify valid.zip
   redactions      PASS  2 records, 0 hashes-only
   summary               0 allowed, 1 refused, 2 redacted, 0 sent to a human, 1 revoked
   refused #5      send-external   reason: outside badge
+  root                  Org1MSP b122c577…db617a1
+  root                  Org2MSP 536f9ef1…3cf97e7
 result: PASS
 ```
+
+The `root` lines are each organisation's root certificate fingerprint,
+computed from the pack (printed in full; shortened here).
 
 ## Reading the report
 
@@ -54,6 +59,10 @@ checked, so read it before relying on the result.
 | 1 | `result: FAIL`: at least one check failed |
 | 2 | the pack could not be read (missing file, not a zip) |
 
+`--json` carries the same verdict as `result` (`PASS`/`FAIL`), the number of
+checks that warned as `warnings`, every problem per check, and the parties
+with their computed root fingerprints.
+
 **Hashes-only packs.** An operator can export a pack that leaves out stripped
 content and content-bearing exception bodies. Those records keep their hashes,
 and their transactions ship withheld, with no payload and no endorsements. The
@@ -64,7 +73,7 @@ ares-verify hashes-only.zip
   manifest        PASS  17 files, exporter sig ok
   chain           PASS  7 records, contiguous, 2026-10-14T09:02Z .. 09:41Z
   transactions    WARN  6/7 write sets match, 1 withheld (hashes-only, not verifiable)
-  endorsements    PASS  2 of 2 parties on every transaction (Org1MSP, Org2MSP)
+  endorsements    PASS  2 of 2 parties on every endorsed transaction (Org1MSP, Org2MSP); 1 withheld (no endorsements)
   redactions      PASS  2 records, 2 hashes-only
   ...
 result: PASS
@@ -101,6 +110,9 @@ from a source you trust (for example the operator's published trust page) and
 pass them with `--pin`.
 
 - A fingerprint is the hex SHA-256 of the root certificate's DER encoding.
+  The report's `root` lines (and `parties[].rootFingerprints` in `--json`)
+  show the fingerprints computed from the pack. Compare them with the
+  operator's published values; pin the published ones, not the pack's.
 - Pin the exporter's organisation too. If it is not pinned, `endorsements`
   fails with `exporter party <MSP> is not pinned`.
 - `--record N` prints each endorser's own certificate fingerprint. That is not
