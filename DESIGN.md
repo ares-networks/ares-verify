@@ -41,3 +41,16 @@ Rules that are easy to break:
 
 Fixture packs get new keys on every `make fixtures`. Tests build their own
 packs in memory, so committed testdata is only used by CI's CLI smoke step.
+
+## CI and releases
+
+`make ci` is the whole gate: gofmt, vet, tests, CLI smoke on the committed
+fixtures, reproducible build, public-content gate. Two CI front ends run it:
+`bitbucket-pipelines.yml` (every push, PRs, and `v*` tags, which also build
+`make dist` binaries + SHA256SUMS as artifacts; nothing is published) and
+`.github/workflows/ci.yml` (for when the repo is mirrored to GitHub).
+
+`scripts/public-gate.sh` greps tracked files for `PUBLIC_GATE_PATTERN`, a
+secured CI variable. The pattern is never committed, because the names it
+blocks are the ones that must not appear here. It reports file:line only.
+Unset means skipped, except on `v*` tags, where it must be set.
