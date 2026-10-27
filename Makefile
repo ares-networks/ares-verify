@@ -4,7 +4,7 @@ LDFLAGS := -s -w -buildid= -X main.version=$(VERSION)
 SHA256  := $(shell command -v sha256sum >/dev/null 2>&1 && echo sha256sum || echo shasum -a 256)
 FLAGS   := -trimpath -buildvcs=false -ldflags "$(LDFLAGS)"
 
-.PHONY: build test vet fmt-check smoke gate ci dist fixtures repro clean
+.PHONY: build test vet fmt-check smoke gate ci dist fixtures repro clean mirror-check
 
 build:
 	CGO_ENABLED=0 $(GO) build $(FLAGS) -o bin/ares-verify ./cmd/ares-verify
@@ -27,6 +27,10 @@ smoke:
 
 gate:
 	./scripts/public-gate.sh
+
+# History guard the GitHub mirror applies (trailers, emails, gate pattern if set).
+mirror-check:
+	./scripts/mirror-github.sh check HEAD
 
 ci: fmt-check vet test smoke repro gate
 

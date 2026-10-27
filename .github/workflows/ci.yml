@@ -1,9 +1,10 @@
 name: ci
 
+# Pull requests are closed by close-pull-requests.yml (read-only mirror), so
+# CI runs on main only. The public-content gate runs upstream before mirroring.
 on:
   push:
     branches: [main]
-  pull_request:
 
 permissions:
   contents: read

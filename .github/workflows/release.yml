@@ -1,0 +1,36 @@
+name: release
+
+# A v* tag reaching this repository builds the release binaries for macOS,
+# Linux and Windows (amd64 + arm64) with SHA256SUMS, and publishes them as a
+# GitHub release whose notes are the tag's annotation.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # checkout can leave a lightweight copy of the tag; the notes come from
+      # the annotation, so fetch the tag object itself.
+      - name: fetch the annotated tag
+        run: git fetch --force origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: checks
+        run: make fmt-check vet test smoke repro
+      - name: build release binaries
+        run: make dist VERSION="${GITHUB_REF_NAME#v}"
+      - name: publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --verify-tag --notes-from-tag --title "ares-verify ${GITHUB_REF_NAME}"

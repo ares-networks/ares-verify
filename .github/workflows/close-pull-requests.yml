@@ -1,0 +1,25 @@
+name: close pull requests
+
+# This repository is a read-only mirror: changes are made upstream and
+# published here, so pull requests cannot be merged. Close them with a pointer
+# to issues. pull_request_target runs with this repository's token and never
+# checks out the pull request's code.
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  close:
+    runs-on: ubuntu-latest
+    steps:
+      - name: close with a note
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr close "$PR" --repo "$GITHUB_REPOSITORY" --comment \
+            "Thanks for this. This repository is a read-only mirror and does not accept pull requests. Please open an issue describing the change instead; see CONTRIBUTING.md."

@@ -10,7 +10,15 @@ carries the signatures of the organisations that confirmed it.
 
 ## Install
 
-Download a release binary for macOS, Linux or Windows, or build it:
+Download a binary for macOS, Linux or Windows from
+[Releases](https://github.com/ares-networks/ares-verify/releases) and check it
+against the release's `SHA256SUMS`:
+
+```
+sha256sum -c --ignore-missing SHA256SUMS          # macOS: shasum -a 256 -c --ignore-missing SHA256SUMS
+```
+
+Or install it with Go:
 
 ```
 go install github.com/ares-networks/ares-verify/cmd/ares-verify@latest
@@ -166,6 +174,12 @@ make test vet       unit and fixture tests
 make fixtures       regenerate testdata/
 make repro          build twice, compare hashes
 ```
+
+## Contributing
+
+Issues are welcome; this repository is a read-only mirror, so pull requests are
+closed. See [CONTRIBUTING.md](CONTRIBUTING.md), including how to report a
+security problem privately.
 
 ## Licence
 

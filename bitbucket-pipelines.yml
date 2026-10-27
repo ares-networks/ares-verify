@@ -1,13 +1,19 @@
-# ares-verify CI + release builds on Bitbucket Pipelines.
+# ares-verify CI, release builds and the GitHub mirror on Bitbucket Pipelines.
 #
 # Every push and pull request: gofmt, vet, tests, CLI smoke on the committed
 # fixtures, a reproducible-build check, and the public-content gate.
-# A v* tag: the same checks (gate required), then release binaries for
-# macOS/Linux/Windows (amd64 + arm64) with SHA256SUMS, kept as pipeline
-# artifacts. Nothing is published anywhere from here.
+# main: the same checks, then a guarded fast-forward push to the GitHub mirror.
+# A v* tag: the checks (gate required), release binaries with SHA256SUMS as
+# pipeline artifacts, then the tag is pushed to the mirror, where the GitHub
+# release workflow publishes the binaries.
 #
-# Repository variables: PUBLIC_GATE_PATTERN (secured, see scripts/public-gate.sh).
+# Repository variables (secured):
+#   PUBLIC_GATE_PATTERN  see scripts/public-gate.sh
+#   GITHUB_MIRROR_KEY    base64 of the GitHub deploy key, see scripts/mirror-github.sh
 image: golang:1.25.7
+
+clone:
+  depth: full # the mirror pushes whole history; GitHub rejects shallow pushes
 
 definitions:
   caches:
@@ -22,6 +28,13 @@ definitions:
 pipelines:
   default:
     - step: *checks
+  branches:
+    main:
+      - step: *checks
+      - step:
+          name: mirror main to GitHub (guarded, fast-forward only)
+          script:
+            - scripts/mirror-github.sh main
   pull-requests:
     '**':
       - step: *checks
@@ -39,3 +52,7 @@ pipelines:
           script:
             - make dist VERSION=${BITBUCKET_TAG#v}
           artifacts: [dist/**]
+      - step:
+          name: mirror tag to GitHub (guarded)
+          script:
+            - scripts/mirror-github.sh tag "$BITBUCKET_TAG"
