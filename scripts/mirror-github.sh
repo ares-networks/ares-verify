@@ -26,6 +26,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="${GITHUB_MIRROR_REPO:-git@github.com:ares-networks/ares-verify.git}"
 allow="${MIRROR_EMAIL_ALLOW:-@ares-networks\\.com$}"
 mode="${1:-}"
+keydir=""   # global: the EXIT trap runs after push() has returned
 
 die() { echo "mirror: $*" >&2; exit 1; }
 
@@ -59,13 +60,13 @@ guard() { # <rev> [tag]
 }
 
 push() { # <src> <dst ref>
-  local src="$1" dst="$2" keydir want got
+  local src="$1" dst="$2" want got
   [[ -n "${GITHUB_MIRROR_KEY:-}" ]] || die "GITHUB_MIRROR_KEY is not set"
   [[ -n "${PUBLIC_GATE_PATTERN:-}" ]] || die "PUBLIC_GATE_PATTERN is not set (required to mirror)"
   REQUIRE_PUBLIC_GATE=1 "$here/public-gate.sh"
   [[ "$(git rev-parse --is-shallow-repository)" == false ]] || die "shallow clone; GitHub needs full history (clone depth: full)"
   keydir="$(mktemp -d)"
-  trap 'rm -rf "$keydir"' EXIT
+  trap '[[ -n "$keydir" ]] && rm -rf "$keydir"' EXIT
   printf '%s' "$GITHUB_MIRROR_KEY" | base64 -d > "$keydir/key" 2>/dev/null || die "GITHUB_MIRROR_KEY is not base64"
   chmod 600 "$keydir/key"
   export GIT_SSH_COMMAND="ssh -i $keydir/key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$here/github_known_hosts"
