@@ -167,6 +167,45 @@ the endorsed part.
 JSON shapes. `testdata/` holds synthetic packs: one valid, one hashes-only, and
 four that are each broken in one way.
 
+## Building packs (library)
+
+`github.com/ares-networks/ares-verify/pkg/replaypack` is the Go package that
+lays a pack out in the format above: records, the endorsed write behind each,
+the parties' roots, and the signed manifest. It builds; this verifier judges.
+
+```
+go get github.com/ares-networks/ares-verify@v0.2.0
+```
+
+```go
+now := time.Now().UTC()
+id, _ := replaypack.NewEphemeralIdentity("DemoMSP", now.Add(-time.Hour), now.Add(24*time.Hour))
+p, _ := replaypack.Build(replaypack.Spec{
+	Tenant: "example-tenant", Scope: "job",
+	Root:     replaypack.Root{SessionID: "sess-1", InitiatorID: "agent-a", OwnerID: "agent-a"},
+	Parties:  []replaypack.PartySpec{{Identity: id, DisplayName: "Demo organisation"}},
+	Exporter: id, ExportedAt: now,
+	Entries: []replaypack.Entry{{Time: now, Kind: "session-open", Session: "sess-1",
+		Agent: "agent-a", Decision: "allow", Channel: "sessions", Chaincode: "sessions-cc",
+		Key: replaypack.CompositeKey("session", "sess-1"), Value: []byte(`{"state":"open"}`)}},
+})
+zip, _ := p.Zip()
+os.WriteFile("pack.zip", zip, 0o644) // ares-verify pack.zip -> result: PASS
+```
+
+An ephemeral identity has a new root on every call, so its packs pass but
+cannot be pinned in advance. For a fixed root, issue a certificate from your
+own CA and load it with `replaypack.NewIdentity(mspID, certPEM, keyPEM,
+rootPEM)`; the key must match the certificate and the certificate must chain
+to the root. `replaypack.Fingerprint(id.Roots[0])` is the value to publish for
+`--pin`. Errors are ignored above for brevity; check them.
+
+Packs downloaded from the public Ares sandbox are built with this package and
+signed by a demo organisation, `AresSandboxMSP`, that exists only for the
+sandbox. Its root fingerprint is on the operator's trust page. A sandbox pack
+whose README.txt says its root is ephemeral came from a local copy of the
+sandbox and will not pass with that pin.
+
 ## Develop
 
 ```

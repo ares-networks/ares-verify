@@ -7,17 +7,22 @@ format is defined in `spec/FORMAT.md`. Code and spec change together.
 ```
 cmd/ares-verify/     cobra CLI: <pack> [--json|--record N] [--pin] [--min-parties]; explain. exit 0/1/2
 cmd/gen-fixtures/    writes testdata/*.zip from internal/fixtures
+pkg/replaypack/      PUBLIC builder: wire types, record hash, fingerprints, identities (PEM or
+                     ephemeral), PRP + composite keys, Build/Resign/Zip. Lays out FORMAT.md v1
 internal/pack/       zip reader (entry/size caps, no traversal, regular files only) + typed parse;
-                     parse errors are kept per file so checks report them instead of aborting
+                     parse errors are kept per file so checks report them instead of aborting;
+                     wire types are aliases of pkg/replaypack's
 internal/canon/      RFC 8785 JCS subset (integers only; fractions/exponents rejected)
-internal/chain/      record hash = sha256(JCS(record - hash) || prevHash); seq/time/link checks
+internal/chain/      record hash = sha256(JCS(record - hash) || prevHash) (replaypack.RecordHash);
+                     seq/time/link checks
 internal/fabtx/      ProposalResponsePayload -> ChaincodeAction -> rwset writes (own namespace);
                      endorsement = ECDSA DER over sha256(prp || SerializedIdentity)
 internal/parties/    per-MSP root/intermediate pools, fingerprints computed (never trusted), pins
 internal/checks/     the 6 checks in FORMAT.md §8 order -> Result{checks, summary, refusals, ok}
 internal/report/     text (one line per check, first 5 problems, root fingerprints) and JSON
                      (result, warnings, checks, summary, refusals, parties)
-internal/fixtures/   synthetic 2-org packs with real protos and signatures; BuildVariant(name)
+internal/fixtures/   synthetic 2-org packs over pkg/replaypack; fixes function "fixture<kind>",
+                     block 10+seq, displayName = MSP id; BuildVariant(name)
 spec/                FORMAT.md (normative), replay-pack-v1.schema.json (shapes)
 testdata/            valid, hashes-only (PASS), tampered-record, dropped-record,
                      missing-endorsement, swapped-party-cert (FAIL)
@@ -43,7 +48,12 @@ Rules that are easy to break:
   them and its detail says how many ("on every endorsed transaction; N
   withheld"), never "every transaction".
 - Dependencies stay small: cobra, fabric-protos-go-apiv2, protobuf. No ledger
-  SDK.
+  SDK. `pkg/replaypack` imports only the standard library, fabric-protos,
+  protobuf and `internal/canon`; the verifier packages import it, never the
+  other way round.
+- `pkg/replaypack` lays out FORMAT.md and never interprets it; a format change
+  bumps both (and the verifier) together. Its API is public: breaking it is a
+  major version, adding to it a minor one.
 - Public repository: no hostnames, deployment or customer names, or internal
   codes in code, fixtures, docs or commit messages. Commits carry an
   `@ares-networks.com` identity and no AI co-author trailers.
