@@ -2,38 +2,19 @@
 package chain
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
-	"strings"
 	"time"
 
-	"github.com/ares-networks/ares-verify/internal/canon"
 	"github.com/ares-networks/ares-verify/internal/pack"
+	"github.com/ares-networks/ares-verify/pkg/replaypack"
 )
 
 // Genesis is the prevHash of record 1.
-var Genesis = strings.Repeat("0", 64)
+var Genesis = replaypack.GenesisHash
 
 // Hash returns hex SHA-256( JCS(record without "hash") || prevHash ).
 // prevHash is taken from the record itself.
-func Hash(raw map[string]any) (string, error) {
-	m := make(map[string]any, len(raw))
-	for k, v := range raw {
-		if k != "hash" {
-			m[k] = v
-		}
-	}
-	prev, _ := raw["prevHash"].(string)
-	b, err := canon.Encode(m)
-	if err != nil {
-		return "", err
-	}
-	h := sha256.New()
-	h.Write(b)
-	h.Write([]byte(prev))
-	return hex.EncodeToString(h.Sum(nil)), nil
-}
+func Hash(raw map[string]any) (string, error) { return replaypack.RecordHash(raw) }
 
 // Result of a chain check.
 type Result struct {

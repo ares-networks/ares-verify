@@ -2,9 +2,7 @@
 package parties
 
 import (
-	"crypto/sha256"
 	"crypto/x509"
-	"encoding/hex"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -12,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ares-networks/ares-verify/internal/pack"
+	"github.com/ares-networks/ares-verify/pkg/replaypack"
 )
 
 // Party is one organisation with parsed certificates.
@@ -32,10 +31,7 @@ type Set struct {
 }
 
 // Fingerprint is hex SHA-256 of a certificate's DER.
-func Fingerprint(c *x509.Certificate) string {
-	s := sha256.Sum256(c.Raw)
-	return hex.EncodeToString(s[:])
-}
+func Fingerprint(c *x509.Certificate) string { return replaypack.Fingerprint(c) }
 
 func parsePEM(s string) ([]*x509.Certificate, error) {
 	var out []*x509.Certificate
